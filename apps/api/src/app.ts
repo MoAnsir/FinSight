@@ -5,6 +5,7 @@ import helmet from '@fastify/helmet'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
+import MetricsPlugin from 'fastify-metrics'
 
 import { AppError } from './lib/errors.js'
 import { authRoutes } from './routes/auth.js'
@@ -17,7 +18,35 @@ export async function buildApp() {
   const app = Fastify({
     logger: {
       level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
+      // Structured fields on every request log
+      serializers: {
+        req(req) {
+          return {
+            method: req.method,
+            url: req.url,
+            requestId: req.id,
+          }
+        },
+        res(res) {
+          return { statusCode: res.statusCode }
+        },
+      },
     },
+    genReqId: () => crypto.randomUUID(),
+  })
+
+  // Attach requestId and userId to every log line emitted during a request
+  app.addHook('onRequest', async (request) => {
+    request.log = request.log.child({ requestId: request.id })
+  })
+
+  app.addHook('onResponse', async (request, reply) => {
+    request.log.info({
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode,
+      durationMs: Math.round(reply.elapsedTime),
+    }, 'request completed')
   })
 
   await app.register(helmet, { global: true })
@@ -32,12 +61,14 @@ export async function buildApp() {
     secret: process.env['JWT_SECRET'] ?? 'dev-secret',
     cookie: { cookieName: 'finsight_token', signed: false },
   })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await app.register(MetricsPlugin as any, { endpoint: '/metrics' })
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
       return reply.code(error.statusCode).send({ statusCode: error.statusCode, error: error.code, message: error.message })
     }
-    app.log.error(error)
+    request.log.error({ err: error }, 'Unhandled error')
     return reply.code(500).send({ statusCode: 500, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred' })
   })
 
