@@ -7,16 +7,56 @@ on:
     branches: [main]
 
 jobs:
-  ci:
-    name: Lint, Typecheck & Test
+  quality:
+    name: Type-check & lint
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # Fail CI on high or critical severity vulnerabilities
+      - run: pnpm audit --audit-level=high
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: finsight
           POSTGRES_PASSWORD: finsight
-          POSTGRES_DB: finsight
+          POSTGRES_DB: finsight_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -24,6 +64,13 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://finsight:finsight@localhost:5432/finsight_test
+      JWT_SECRET: ci-test-secret
+      NODE_ENV: test
+      # AI key is optional — tests mock or skip AI paths
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,18 +86,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm typecheck
-
-      - run: pnpm lint
-
-      - run: pnpm --filter @finsight/api exec prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://finsight:finsight@localhost:5432/finsight
+      - name: Run migrations
+        run: pnpm --filter @finsight/api exec prisma migrate deploy
 
       - run: pnpm test
-        env:
-          DATABASE_URL: postgresql://finsight:finsight@localhost:5432/finsight
-          JWT_SECRET: ci-test-secret
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-      - run: pnpm build
