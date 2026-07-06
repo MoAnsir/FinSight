@@ -4,6 +4,14 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { RegisterSchema, LoginSchema } from '@finsight/types'
 
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'strict' as const,
+  secure: process.env['NODE_ENV'] === 'production',
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60,
+}
+
 export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post('/register', async (request, reply) => {
     const body = RegisterSchema.safeParse(request.body)
@@ -21,7 +29,8 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const user = await prisma.user.create({ data: { email, passwordHash, name: name ?? null } })
 
     const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: '7d' })
-    return reply.code(201).send({ token, user: { id: user.id, email: user.email, name: user.name } })
+    reply.setCookie('finsight_token', token, COOKIE_OPTS)
+    return reply.code(201).send({ user: { id: user.id, email: user.email, name: user.name } })
   })
 
   app.post('/login', async (request, reply) => {
@@ -39,7 +48,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     if (!valid) return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Invalid credentials' })
 
     const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: '7d' })
-    return { token, user: { id: user.id, email: user.email, name: user.name } }
+    reply.setCookie('finsight_token', token, COOKIE_OPTS)
+    return { user: { id: user.id, email: user.email, name: user.name } }
+  })
+
+  app.post('/logout', async (_request, reply) => {
+    reply.clearCookie('finsight_token', { path: '/' })
+    return reply.code(204).send()
   })
 
   app.get('/me', { preHandler: [async (req, rep) => { try { await req.jwtVerify() } catch { rep.code(401).send({ message: 'Unauthorized' }) } }] }, async (request) => {

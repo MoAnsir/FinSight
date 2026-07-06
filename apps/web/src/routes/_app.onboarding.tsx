@@ -20,11 +20,10 @@ function OnboardingPage() {
       if (!file) throw new Error('No file selected')
       const form = new FormData()
       form.append('file', file)
-      const token = localStorage.getItem('finsight_token')
       const params = new URLSearchParams({ date: dateCol, description: descCol, amount: amtCol })
       const res = await fetch(`/api/transactions/import?${params}`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
         body: form,
       })
       if (!res.ok) throw new Error('Import failed')
