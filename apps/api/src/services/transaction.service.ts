@@ -3,6 +3,7 @@ import { parse } from 'csv-parse/sync'
 import type { MultipartFile } from '@fastify/multipart'
 import { prisma } from '../lib/prisma.js'
 import { AppError } from '../lib/errors.js'
+import { pushToUser } from '../lib/connections.js'
 import type { z } from 'zod'
 import type { TransactionFilterSchema, CsvColumnMapSchema } from '@finsight/types'
 
@@ -74,7 +75,51 @@ export async function importTransactions(userId: string, file: MultipartFile, co
     }
   }
 
+  await checkBudgetThresholds(userId, account.id)
   return { imported, skipped, total: records.length }
+}
+
+async function checkBudgetThresholds(userId: string, accountId: string) {
+  const budgets = await prisma.budget.findMany({ where: { userId } })
+  if (budgets.length === 0) return
+
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const spending = await prisma.transaction.groupBy({
+    by: ['category'],
+    where: { accountId, date: { gte: startOfMonth }, amount: { lt: 0 } },
+    _sum: { amount: true },
+  })
+
+  const spendingMap = Object.fromEntries(
+    spending.map((s) => [s.category, Math.abs(Number(s._sum.amount ?? 0))])
+  )
+
+  for (const budget of budgets) {
+    const spent = spendingMap[budget.category] ?? 0
+    const limit = Number(budget.limitAmount)
+    const percentUsed = Math.round((spent / limit) * 100)
+
+    // Push an alert at 80% and again at 100%
+    if (percentUsed >= 100) {
+      pushToUser(userId, {
+        type: 'budget:threshold',
+        category: budget.category,
+        percentUsed,
+        spent,
+        limit,
+        severity: 'exceeded',
+      })
+    } else if (percentUsed >= 80) {
+      pushToUser(userId, {
+        type: 'budget:threshold',
+        category: budget.category,
+        percentUsed,
+        spent,
+        limit,
+        severity: 'warning',
+      })
+    }
+  }
 }
 
 export async function updateTransaction(userId: string, id: string, patch: Record<string, unknown>) {

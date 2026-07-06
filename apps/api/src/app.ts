@@ -6,6 +6,7 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import MetricsPlugin from 'fastify-metrics'
+import websocket from '@fastify/websocket'
 
 import { AppError } from './lib/errors.js'
 import { authRoutes } from './routes/auth.js'
@@ -13,6 +14,7 @@ import { transactionRoutes } from './routes/transactions.js'
 import { budgetRoutes } from './routes/budgets.js'
 import { aiRoutes } from './routes/ai.js'
 import { insightRoutes } from './routes/insights.js'
+import { wsRoutes } from './routes/ws.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -63,6 +65,7 @@ export async function buildApp() {
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await app.register(MetricsPlugin as any, { endpoint: '/metrics' })
+  await app.register(websocket)
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
@@ -83,6 +86,7 @@ export async function buildApp() {
   await app.register(budgetRoutes, { prefix: '/api/budgets' })
   await app.register(aiRoutes, { prefix: '/api/ai' })
   await app.register(insightRoutes, { prefix: '/api' })
+  await app.register(wsRoutes)
 
   return app
 }
