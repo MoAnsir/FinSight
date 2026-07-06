@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { api } from '@/lib/api'
+import { useInsights } from '@/hooks/useInsights'
 import { formatCurrency } from '@/lib/utils'
+import { Card, PageHeader } from '@/components/ui'
 
 export const Route = createFileRoute('/_app/insights')({
   component: InsightsPage,
@@ -11,10 +11,7 @@ export const Route = createFileRoute('/_app/insights')({
 const COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16']
 
 function InsightsPage() {
-  const { data, isLoading } = useQuery<{ categoryBreakdown: { category: string | null; _sum: { amount: string }; _count: number }[] }>({
-    queryKey: ['insights'],
-    queryFn: () => api.get('/insights'),
-  })
+  const { data, isLoading } = useInsights()
 
   const pieData = (data?.categoryBreakdown ?? [])
     .filter((c) => Number(c._sum.amount) < 0)
@@ -23,12 +20,12 @@ function InsightsPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Insights</h1>
+      <PageHeader title="Insights" />
       {isLoading ? (
         <div className="text-gray-500">Loading…</div>
       ) : (
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <Card padding="lg">
             <h2 className="text-base font-semibold text-gray-900 mb-4">Spending by Category</h2>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
@@ -39,9 +36,9 @@ function InsightsPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <Card padding="lg">
             <h2 className="text-base font-semibold text-gray-900 mb-4">Category Breakdown</h2>
             <div className="space-y-3">
               {pieData.map((item, i) => (
@@ -52,7 +49,7 @@ function InsightsPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

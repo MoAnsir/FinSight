@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { z } from 'zod'
-import { api } from '@/lib/api'
+import { useTransactions, useUpdateTransaction } from '@/hooks/useTransactions'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { Button, Badge, PageHeader } from '@/components/ui'
 import { ImportModal } from '@/components/ImportModal'
-import type { Transaction, Paginated } from '@finsight/types'
+import type { Transaction } from '@finsight/types'
 
 const searchSchema = z.object({
   page: z.coerce.number().default(1),
@@ -18,49 +18,104 @@ export const Route = createFileRoute('/_app/transactions')({
   component: TransactionsPage,
 })
 
+function CategoryEditor({ transaction, onClose }: { transaction: Transaction; onClose: () => void }) {
+  const [value, setValue] = useState(transaction.category ?? '')
+  const updateMutation = useUpdateTransaction()
+
+  return (
+    <div className="flex gap-2">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="px-2 py-1 border border-indigo-400 rounded text-xs focus:outline-none"
+        autoFocus
+      />
+      <button
+        onClick={() => updateMutation.mutate({ id: transaction.id, category: value }, { onSuccess: onClose })}
+        className="text-xs text-indigo-600 font-medium"
+      >
+        Save
+      </button>
+      <button onClick={onClose} className="text-xs text-gray-400">Cancel</button>
+    </div>
+  )
+}
+
+function TransactionRow({ transaction }: { transaction: Transaction }) {
+  const [editing, setEditing] = useState(false)
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-3 text-gray-500">{formatDate(transaction.date)}</td>
+      <td className="px-4 py-3 text-gray-900">{transaction.description}</td>
+      <td className="px-4 py-3">
+        {editing ? (
+          <CategoryEditor transaction={transaction} onClose={() => setEditing(false)} />
+        ) : (
+          <Badge onClick={() => setEditing(true)}>
+            {transaction.category ?? 'Uncategorised'}
+          </Badge>
+        )}
+      </td>
+      <td className={cn('px-4 py-3 text-right font-medium', Number(transaction.amount) < 0 ? 'text-red-500' : 'text-green-600')}>
+        {formatCurrency(Number(transaction.amount))}
+      </td>
+    </tr>
+  )
+}
+
+function TransactionTable({ transactions }: { transactions: Transaction[] }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
+            <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {transactions.map((tx) => <TransactionRow key={tx.id} transaction={tx} />)}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Pagination({ page, totalPages }: { page: number; totalPages: number }) {
+  const navigate = useNavigate({ from: '/transactions' })
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-between mt-4">
+      <Button variant="secondary" size="sm" disabled={page <= 1}
+        onClick={() => navigate({ search: (prev) => ({ ...prev, page: prev.page - 1 }) })}>
+        Previous
+      </Button>
+      <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
+      <Button variant="secondary" size="sm" disabled={page >= totalPages}
+        onClick={() => navigate({ search: (prev) => ({ ...prev, page: prev.page + 1 }) })}>
+        Next
+      </Button>
+    </div>
+  )
+}
+
 function TransactionsPage() {
   const search = useSearch({ from: '/_app/transactions' })
   const navigate = useNavigate({ from: '/transactions' })
-  const qc = useQueryClient()
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editCategory, setEditCategory] = useState('')
   const [showImport, setShowImport] = useState(false)
-
-  const { data, isLoading } = useQuery<Paginated<Transaction>>({
-    queryKey: ['transactions', search],
-    queryFn: () => {
-      const params = new URLSearchParams()
-      params.set('page', String(search.page))
-      if (search.search) params.set('search', search.search)
-      if (search.category) params.set('category', search.category)
-      return api.get(`/transactions?${params}`)
-    },
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, category }: { id: string; category: string }) =>
-      api.patch(`/transactions/${id}`, { category }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      setEditingId(null)
-    },
-  })
+  const { data, isLoading } = useTransactions({ page: search.page, search: search.search, category: search.category })
 
   return (
     <div className="p-8">
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{data?.total ?? 0} total</span>
-          <button
-            onClick={() => setShowImport(true)}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium"
-          >
-            Import CSV
-          </button>
-        </div>
-      </div>
+
+      <PageHeader title="Transactions">
+        <span className="text-sm text-gray-500">{data?.total ?? 0} total</span>
+        <Button onClick={() => setShowImport(true)}>Import CSV</Button>
+      </PageHeader>
 
       <div className="flex gap-3 mb-5">
         <input
@@ -72,75 +127,13 @@ function TransactionsPage() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading…</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(data?.data ?? []).map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-500">{formatDate(tx.date)}</td>
-                  <td className="px-4 py-3 text-gray-900">{tx.description}</td>
-                  <td className="px-4 py-3">
-                    {editingId === tx.id ? (
-                      <div className="flex gap-2">
-                        <input
-                          value={editCategory}
-                          onChange={(e) => setEditCategory(e.target.value)}
-                          className="px-2 py-1 border border-indigo-400 rounded text-xs focus:outline-none"
-                          autoFocus
-                        />
-                        <button onClick={() => updateMutation.mutate({ id: tx.id, category: editCategory })}
-                          className="text-xs text-indigo-600 font-medium">Save</button>
-                        <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">Cancel</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => { setEditingId(tx.id); setEditCategory(tx.category ?? '') }}
-                        className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
-                      >
-                        {tx.category ?? 'Uncategorised'}
-                      </button>
-                    )}
-                  </td>
-                  <td className={cn('px-4 py-3 text-right font-medium', Number(tx.amount) < 0 ? 'text-red-500' : 'text-green-600')}>
-                    {formatCurrency(Number(tx.amount))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <button
-            disabled={search.page <= 1}
-            onClick={() => navigate({ search: (prev) => ({ ...prev, page: prev.page - 1 }) })}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-600">Page {search.page} of {data.totalPages}</span>
-          <button
-            disabled={search.page >= data.totalPages}
-            onClick={() => navigate({ search: (prev) => ({ ...prev, page: prev.page + 1 }) })}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+      {isLoading ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">Loading…</div>
+      ) : (
+        <TransactionTable transactions={data?.data ?? []} />
       )}
+
+      <Pagination page={search.page} totalPages={data?.totalPages ?? 0} />
     </div>
   )
 }
