@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth'
 import { cn } from '@/lib/utils'
+import { BudgetAlertToast } from '@/components/BudgetAlertToast'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -62,6 +63,7 @@ function AppLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <BudgetAlertToast />
     </div>
   )
 }
