@@ -1,9 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useAuthStore } from '@/stores/auth'
 
 export const Route = createFileRoute('/')({
   beforeLoad: () => {
-    const token = localStorage.getItem('finsight_token')
-    if (token) throw redirect({ to: '/dashboard' })
+    const { user } = useAuthStore.getState()
+    if (user) throw redirect({ to: '/dashboard' })
     throw redirect({ to: '/login' })
   },
   component: () => null,

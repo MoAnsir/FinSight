@@ -14,8 +14,8 @@ const NAV = [
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: () => {
-    const token = localStorage.getItem('finsight_token')
-    if (!token) throw redirect({ to: '/login' })
+    const { user } = useAuthStore.getState()
+    if (!user) throw redirect({ to: '/login' })
   },
   component: AppLayout,
 })

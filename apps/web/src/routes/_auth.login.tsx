@@ -15,9 +15,9 @@ function LoginPage() {
   const navigate = useNavigate()
 
   const mutation = useMutation({
-    mutationFn: () => api.post<{ token: string; user: { id: string; email: string; name: string | null } }>('/auth/login', { email, password }),
+    mutationFn: () => api.post<{ user: { id: string; email: string; name: string | null } }>('/auth/login', { email, password }),
     onSuccess: (data) => {
-      login(data.token, data.user)
+      login(data.user)
       navigate({ to: '/dashboard' })
     },
   })

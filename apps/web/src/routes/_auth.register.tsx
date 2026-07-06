@@ -16,9 +16,9 @@ function RegisterPage() {
   const navigate = useNavigate()
 
   const mutation = useMutation({
-    mutationFn: () => api.post<{ token: string; user: { id: string; email: string; name: string | null } }>('/auth/register', { email, password, name }),
+    mutationFn: () => api.post<{ user: { id: string; email: string; name: string | null } }>('/auth/register', { email, password, name }),
     onSuccess: (data) => {
-      login(data.token, data.user)
+      login(data.user)
       navigate({ to: '/onboarding' })
     },
   })

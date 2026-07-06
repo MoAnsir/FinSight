@@ -1,26 +1,14 @@
 const API_BASE = '/api'
 
-function getToken(): string | null {
-  return localStorage.getItem('finsight_token')
-}
-
-export function setToken(token: string) {
-  localStorage.setItem('finsight_token', token)
-}
-
-export function clearToken() {
-  localStorage.removeItem('finsight_token')
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken()
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...init?.headers,
-  }
-
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  })
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
