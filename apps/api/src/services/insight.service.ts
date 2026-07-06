@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js'
-import { chatWithContext } from '../lib/ai.js'
+import { runAgenticLoop } from '../lib/ai.js'
 
 export async function getInsights(userId: string) {
   const account = await prisma.account.findFirst({ where: { userId } })
@@ -34,20 +34,41 @@ export async function getForecast(userId: string) {
   const account = await prisma.account.findFirst({ where: { userId } })
   if (!account) return { summary: '' }
 
-  const transactions = await prisma.transaction.findMany({
-    where: { accountId: account.id, date: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
-    orderBy: { date: 'asc' },
-  })
-
-  const contextData = JSON.stringify(
-    transactions.map((t) => ({ date: t.date, amount: Number(t.amount), category: t.category })),
+  const chunks: string[] = []
+  await runAgenticLoop(
+    'You are a financial forecasting assistant. Use the query_transactions and compute_category_totals tools to analyse the user\'s spending, then provide a concise 30-day cash flow forecast.',
+    'Please forecast my cash flow for the next 30 days.',
+    async (name, input) => {
+      const { category, dateFrom, dateTo, limit = 90 } = input as Record<string, unknown>
+      if (name === 'query_transactions') {
+        return prisma.transaction.findMany({
+          where: {
+            accountId: account.id,
+            ...(category ? { category: String(category) } : {}),
+            ...(dateFrom ? { date: { gte: new Date(String(dateFrom)) } } : {}),
+          },
+          orderBy: { date: 'asc' },
+          take: Math.min(Number(limit), 200),
+          select: { date: true, amount: true, category: true },
+        })
+      }
+      if (name === 'compute_category_totals') {
+        const rows = await prisma.transaction.groupBy({
+          by: ['category'],
+          where: {
+            accountId: account.id,
+            amount: { lt: 0 },
+            ...(dateFrom ? { date: { gte: new Date(String(dateFrom)) } } : {}),
+            ...(dateTo ? { date: { lte: new Date(String(dateTo)) } } : {}),
+          },
+          _sum: { amount: true },
+        })
+        return rows.map((r) => ({ category: r.category, total: Math.abs(Number(r._sum.amount ?? 0)) }))
+      }
+      return []
+    },
+    (chunk) => { if (chunk.type === 'text') chunks.push(chunk.delta) },
   )
 
-  const summary = await chatWithContext(
-    'You are a financial forecasting assistant. Analyse the transaction history and provide a 30-day cash flow forecast with key insights.',
-    'Please forecast my cash flow for the next 30 days based on my transaction history.',
-    contextData,
-  )
-
-  return { summary }
+  return { summary: chunks.join('') }
 }
