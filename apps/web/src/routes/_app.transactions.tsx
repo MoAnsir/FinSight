@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { ImportModal } from '@/components/ImportModal'
 import type { Transaction, Paginated } from '@finsight/types'
 
 const searchSchema = z.object({
@@ -23,6 +24,7 @@ function TransactionsPage() {
   const qc = useQueryClient()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editCategory, setEditCategory] = useState('')
+  const [showImport, setShowImport] = useState(false)
 
   const { data, isLoading } = useQuery<Paginated<Transaction>>({
     queryKey: ['transactions', search],
@@ -46,9 +48,18 @@ function TransactionsPage() {
 
   return (
     <div className="p-8">
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-        <span className="text-sm text-gray-500">{data?.total ?? 0} total</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{data?.total ?? 0} total</span>
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium"
+          >
+            Import CSV
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-3 mb-5">
