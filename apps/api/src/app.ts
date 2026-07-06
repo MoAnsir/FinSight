@@ -6,6 +6,7 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 
+import { AppError } from './lib/errors.js'
 import { authRoutes } from './routes/auth.js'
 import { transactionRoutes } from './routes/transactions.js'
 import { budgetRoutes } from './routes/budgets.js'
@@ -30,6 +31,14 @@ export async function buildApp() {
   await app.register(jwt, {
     secret: process.env['JWT_SECRET'] ?? 'dev-secret',
     cookie: { cookieName: 'finsight_token', signed: false },
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof AppError) {
+      return reply.code(error.statusCode).send({ statusCode: error.statusCode, error: error.code, message: error.message })
+    }
+    app.log.error(error)
+    return reply.code(500).send({ statusCode: 500, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred' })
   })
 
   app.get('/health', async () => ({

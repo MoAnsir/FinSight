@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import bcrypt from 'bcryptjs'
-import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
+import { AppError } from '../lib/errors.js'
 import { RegisterSchema, LoginSchema } from '@finsight/types'
 
 const COOKIE_OPTS = {
@@ -23,7 +23,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const { email, password, name } = body.data
 
     const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) return reply.code(409).send({ statusCode: 409, error: 'Conflict', message: 'Email already registered' })
+    if (existing) throw AppError.conflict('Email already registered')
 
     const passwordHash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({ data: { email, passwordHash, name: name ?? null } })
@@ -42,10 +42,8 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     const { email, password } = body.data
     const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Invalid credentials' })
-
-    const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Invalid credentials' })
+    const valid = user ? await bcrypt.compare(password, user.passwordHash) : false
+    if (!user || !valid) throw AppError.unauthorized('Invalid credentials')
 
     const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: '7d' })
     reply.setCookie('finsight_token', token, COOKIE_OPTS)
