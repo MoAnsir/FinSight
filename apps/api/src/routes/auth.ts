@@ -42,7 +42,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     const { email, password } = body.data
     const user = await prisma.user.findUnique({ where: { email } })
-    const valid = user ? await bcrypt.compare(password, user.passwordHash) : false
+    // Always run bcrypt to prevent user-enumeration via timing side-channel
+    const hashToCompare = user?.passwordHash ?? '$2a$12$invalidhashpadding000000000000000000000000000000000000'
+    const valid = await bcrypt.compare(password, hashToCompare)
     if (!user || !valid) throw AppError.unauthorized('Invalid credentials')
 
     const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: '7d' })
