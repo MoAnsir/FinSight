@@ -197,6 +197,18 @@ pnpm --filter @finsight/web test
 DATABASE_URL=postgresql://finsight:finsight@localhost:5432/finsight_test pnpm test
 ```
 
+### How tests run in CI
+
+Every pull request triggers the full test suite on GitHub Actions before it can be merged into `main`. Three jobs run in parallel:
+
+| Job | What it does |
+|-----|-------------|
+| Type-check & lint | `tsc --noEmit`, ESLint, production build |
+| Dependency audit | `pnpm audit --prod` — fails on high/critical CVEs in production deps |
+| Tests | Spins up a Postgres 16 container, runs `prisma migrate deploy`, then `pnpm test` |
+
+All three must pass for the merge button to go green. Pushing a fix to the branch re-triggers the checks automatically. This means the `main` branch is always in a passing state — no broken code can land without CI approval.
+
 ---
 
 ## Branches
