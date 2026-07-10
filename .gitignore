@@ -11,5 +11,4 @@ coverage
 .env.*
 !.env.example
 
-# generated files
-apps/web/src/routeTree.gen.ts
+# generated files — routeTree.gen.ts is committed so CI typecheck works without a build step

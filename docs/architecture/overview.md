@@ -183,13 +183,38 @@ Log format is structured JSON (Pino). In development, pretty-printed via `pino-p
 |---------|---------------|
 | Auth token storage | httpOnly SameSite=Strict cookie — JS cannot read it |
 | CSRF | SameSite=Strict makes cross-site requests arrive without the cookie |
-| Password storage | bcrypt cost factor 12 |
+| Password storage | bcrypt cost factor 12; always runs for unknown emails (no timing enumeration) |
 | Security headers | `@fastify/helmet` — CSP, HSTS, X-Frame-Options etc. |
 | Rate limiting | `@fastify/rate-limit` — 100 req/min per IP |
 | CORS | Restricted to `CORS_ORIGIN` env var |
 | SQL injection | All queries through Prisma (parameterised) |
 | AI key exposure | `ANTHROPIC_API_KEY` never leaves the API server |
 | Input validation | Zod at every HTTP boundary before any DB access |
+
+---
+
+## Testing Strategy
+
+The test suite follows the integration-first principle: the database layer is never mocked. Every service test executes real SQL against a `finsight_test` Postgres instance.
+
+```
+apps/api/src/test/
+  setup.ts                   ← beforeEach wipe, shared prisma client
+  factories.ts               ← createUser / createAccount / createTransaction / createBudget
+  auth.integration.test.ts   ← HTTP-level tests via Fastify inject()
+  transaction.service.test.ts
+  budget.service.test.ts
+
+apps/web/src/test/
+  setup.ts                   ← @testing-library/jest-dom matchers
+  BudgetAlertToast.test.tsx
+  Button.test.tsx
+  utils.test.ts
+```
+
+**Why real DB over mocks?** Mocked DB tests have historically passed while prod migrations failed (missed unique constraint violations, FK cascade behaviour, Prisma decimal precision). Integration tests catch the layer that actually breaks.
+
+**CI:** The `test` job in `.github/workflows/ci.yml` spins up a Postgres 16 service container, runs `prisma migrate deploy`, then `pnpm test`. No secrets required to run the suite — AI tests are either skipped or the key is injected from `secrets.ANTHROPIC_API_KEY`.
 
 ---
 

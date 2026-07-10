@@ -14,8 +14,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -34,8 +32,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -43,8 +39,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      # Fail CI on high or critical severity vulnerabilities
-      - run: pnpm audit --audit-level=high
+      # Fail CI on high or critical severity vulnerabilities in production deps only
+      # --prod excludes devDependencies (vitest, vite, etc.) whose vulns don't affect runtime
+      - run: pnpm audit --audit-level=high --prod
 
   test:
     name: Tests
@@ -76,8 +73,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -85,6 +80,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @finsight/api exec prisma generate
 
       - name: Run migrations
         run: pnpm --filter @finsight/api exec prisma migrate deploy

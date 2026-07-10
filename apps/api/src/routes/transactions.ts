@@ -13,7 +13,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     return listTransactions(userId, filter)
   })
 
-  app.post('/import', async (request, reply) => {
+  app.post('/import', async (request, _reply) => {
     const userId = getRequestUser(request)
     const file = await request.file()
     if (!file) throw AppError.badRequest('No file uploaded')

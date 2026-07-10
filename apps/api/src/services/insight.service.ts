@@ -63,7 +63,7 @@ export async function getForecast(userId: string) {
           },
           _sum: { amount: true },
         })
-        return rows.map((r) => ({ category: r.category, total: Math.abs(Number(r._sum.amount ?? 0)) }))
+        return rows.map((r: (typeof rows)[number]) => ({ category: r.category, total: Math.abs(Number(r._sum.amount ?? 0)) }))
       }
       return []
     },
