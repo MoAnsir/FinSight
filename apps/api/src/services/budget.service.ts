@@ -9,7 +9,7 @@ export async function listBudgets(userId: string) {
   const budgets = await prisma.budget.findMany({ where: { userId }, orderBy: { category: 'asc' } })
 
   const account = await prisma.account.findFirst({ where: { userId } })
-  if (!account) return budgets.map((b) => ({ ...b, spent: 0, remaining: Number(b.limitAmount), percentUsed: 0 }))
+  if (!account) return budgets.map((b: (typeof budgets)[number]) => ({ ...b, spent: 0, remaining: Number(b.limitAmount), percentUsed: 0 }))
 
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   const spending = await prisma.transaction.groupBy({
@@ -18,9 +18,9 @@ export async function listBudgets(userId: string) {
     _sum: { amount: true },
   })
 
-  const spendingMap = Object.fromEntries(spending.map((s) => [s.category, Math.abs(Number(s._sum.amount ?? 0))]))
+  const spendingMap = Object.fromEntries(spending.map((s: (typeof spending)[number]) => [s.category, Math.abs(Number(s._sum.amount ?? 0))]))
 
-  return budgets.map((b) => {
+  return budgets.map((b: (typeof budgets)[number]) => {
     const spent = spendingMap[b.category] ?? 0
     const limit = Number(b.limitAmount)
     return { ...b, spent, remaining: limit - spent, percentUsed: Math.round((spent / limit) * 100) }

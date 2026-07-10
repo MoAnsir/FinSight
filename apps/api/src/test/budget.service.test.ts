@@ -36,7 +36,7 @@ describe('listBudgets', () => {
     await createTransaction(account.id, { category: 'Food', amount: -100, date: thisMonth })
 
     const budgets = await listBudgets(user.id)
-    const foodBudget = budgets.find((b) => b.category === 'Food')
+    const foodBudget = budgets.find((b: (typeof budgets)[number]) => b.category === 'Food')
 
     expect(foodBudget?.spent).toBe(200)
     expect(foodBudget?.remaining).toBe(300)
@@ -54,7 +54,7 @@ describe('listBudgets', () => {
     await createTransaction(account.id, { category: 'Food', amount: -200, date: lastMonth })
 
     const budgets = await listBudgets(user.id)
-    const foodBudget = budgets.find((b) => b.category === 'Food')
+    const foodBudget = budgets.find((b: (typeof budgets)[number]) => b.category === 'Food')
 
     expect(foodBudget?.spent).toBe(0)
     expect(foodBudget?.percentUsed).toBe(0)
@@ -68,7 +68,7 @@ describe('listBudgets', () => {
     await createTransaction(account.id, { category: 'Food', amount: 200 }) // refund — positive
 
     const budgets = await listBudgets(user.id)
-    expect(budgets.find((b) => b.category === 'Food')?.spent).toBe(0)
+    expect(budgets.find((b: (typeof budgets)[number]) => b.category === 'Food')?.spent).toBe(0)
   })
 })
 

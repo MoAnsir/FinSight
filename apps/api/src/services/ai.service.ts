@@ -46,7 +46,7 @@ async function buildToolExecutor(userId: string) {
           _count: true,
           orderBy: { _sum: { amount: 'asc' } },
         })
-        return rows.map((r) => ({ category: r.category, total: Math.abs(Number(r._sum.amount ?? 0)), count: r._count }))
+        return rows.map((r: (typeof rows)[number]) => ({ category: r.category, total: Math.abs(Number(r._sum.amount ?? 0)), count: r._count }))
       }
 
       case 'find_recurring_payments': {
@@ -58,7 +58,7 @@ async function buildToolExecutor(userId: string) {
           orderBy: { _count: { amount: 'desc' } },
           take: 20,
         })
-        return rows.map((r) => ({ description: r.description, amount: Math.abs(Number(r.amount)), occurrences: r._count }))
+        return rows.map((r: (typeof rows)[number]) => ({ description: r.description, amount: Math.abs(Number(r.amount)), occurrences: r._count }))
       }
 
       case 'get_budget_status': {
@@ -69,8 +69,8 @@ async function buildToolExecutor(userId: string) {
           where: { accountId: account.id, date: { gte: startOfMonth }, amount: { lt: 0 } },
           _sum: { amount: true },
         })
-        const spendingMap = Object.fromEntries(spending.map((s) => [s.category, Math.abs(Number(s._sum.amount ?? 0))]))
-        return budgets.map((b) => {
+        const spendingMap = Object.fromEntries(spending.map((s: (typeof spending)[number]) => [s.category, Math.abs(Number(s._sum.amount ?? 0))]))
+        return budgets.map((b: (typeof budgets)[number]) => {
           const spent = spendingMap[b.category] ?? 0
           const limit = Number(b.limitAmount)
           return { category: b.category, limit, spent, remaining: limit - spent, percentUsed: Math.round((spent / limit) * 100) }

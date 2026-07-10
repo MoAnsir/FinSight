@@ -39,8 +39,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      # Fail CI on high or critical severity vulnerabilities
-      - run: pnpm audit --audit-level=high
+      # Fail CI on high or critical severity vulnerabilities in production deps only
+      # --prod excludes devDependencies (vitest, vite, etc.) whose vulns don't affect runtime
+      - run: pnpm audit --audit-level=high --prod
 
   test:
     name: Tests

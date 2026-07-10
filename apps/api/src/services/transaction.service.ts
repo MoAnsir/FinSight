@@ -91,7 +91,7 @@ async function checkBudgetThresholds(userId: string, accountId: string) {
   })
 
   const spendingMap = Object.fromEntries(
-    spending.map((s) => [s.category, Math.abs(Number(s._sum.amount ?? 0))])
+    spending.map((s: (typeof spending)[number]) => [s.category, Math.abs(Number(s._sum.amount ?? 0))])
   )
 
   for (const budget of budgets) {
