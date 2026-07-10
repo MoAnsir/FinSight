@@ -85,7 +85,7 @@ pnpm typecheck
 # Lint all packages
 pnpm lint
 
-# Run all tests
+# Run all tests (see Testing section below)
 pnpm test
 
 # Build for production
@@ -140,6 +140,61 @@ docker compose down
 
 # Stop everything and delete the database volume (full reset)
 docker compose down -v
+```
+
+---
+
+## Testing
+
+The test suite is split across two packages.
+
+### Backend (API) — integration tests
+
+All API tests hit a real Postgres database. They require a `finsight_test` database to exist with the schema applied.
+
+```bash
+# 1. Create the test database (one-time)
+docker compose up postgres -d
+docker exec -it finsight-postgres-1 psql -U finsight -c "CREATE DATABASE finsight_test;"
+
+# 2. Apply migrations to the test database
+DATABASE_URL=postgresql://finsight:finsight@localhost:5432/finsight_test \
+  pnpm --filter @finsight/api exec prisma migrate deploy
+
+# 3. Run the tests
+DATABASE_URL=postgresql://finsight:finsight@localhost:5432/finsight_test \
+  pnpm --filter @finsight/api test
+```
+
+What's covered:
+
+| Suite | Tests | Covers |
+|-------|-------|--------|
+| `auth.integration.test.ts` | 7 | Register, login, logout, duplicate email, weak password, user enumeration |
+| `transaction.service.test.ts` | 10 | List, filter, paginate, multi-tenant isolation, category update, duplicate detection |
+| `budget.service.test.ts` | 9 | Create, spend calculation, month boundaries, income exclusion, update, delete |
+
+Tests run sequentially (one file at a time) to avoid DB conflicts. Each test starts from a clean slate via `beforeEach` that wipes all rows.
+
+### Frontend (web) — component tests
+
+No database required — the frontend tests run entirely in jsdom.
+
+```bash
+pnpm --filter @finsight/web test
+```
+
+| Suite | Tests | Covers |
+|-------|-------|--------|
+| `BudgetAlertToast.test.tsx` | 6 | Alert rendering, warning/exceeded variants, stacking, dismiss, auto-dismiss |
+| `Button.test.tsx` | 5 | Variants, size classes, disabled state, click handler |
+| `utils.test.ts` | 6 | `formatCurrency`, `formatDate` formatting and edge cases |
+
+### Run everything
+
+```bash
+# Runs both API and web tests (CI uses this)
+DATABASE_URL=postgresql://finsight:finsight@localhost:5432/finsight_test pnpm test
 ```
 
 ---
